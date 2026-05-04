@@ -122,6 +122,8 @@ body {
   transition: all 0.2s;
   box-shadow: var(--shadow);
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -1199,6 +1201,182 @@ function getTaskIcon(id) {
   const icons = { u1: '📊', u2: '🔍', t3: '📊', t5: '🔍' };
   return icons[id] || '📌';
 }
+
+// ── TOUCH DRAG & DROP ──
+// HTML5 DnD API はタッチ操作に未対応のブラウザ（Firefox for Android 等）向け補完
+(function () {
+  var touchDragEl = null;
+  var touchClone  = null;
+  var touchOffX   = 0, touchOffY = 0;
+  var touchStartX = 0, touchStartY = 0;
+  var dragTimer   = null;
+  var isDragging  = false;
+  var hlEl        = null; // ハイライト中のドロップ対象
+
+  function attach(el) {
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  }
+
+  // 既存のドラッグ可能要素にアタッチ
+  document.querySelectorAll('[draggable="true"]').forEach(attach);
+
+  // 動的に追加されるカード（プールへ戻したカード、溢れタスク等）も対象にする
+  new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(n) {
+        if (n.nodeType !== 1) return;
+        if (n.getAttribute && n.getAttribute('draggable') === 'true') attach(n);
+        if (n.querySelectorAll) n.querySelectorAll('[draggable="true"]').forEach(attach);
+      });
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+
+  // タッチ開始 — 250ms 長押しでドラッグ開始（それ以前に動いたらスクロールと判定）
+  function onStart(e) {
+    if (e.touches.length !== 1) return;
+    var t = e.touches[0];
+    touchStartX = t.clientX; touchStartY = t.clientY;
+
+    dragTimer = setTimeout(function() {
+      dragTimer = null;
+      beginDrag(e.currentTarget);
+    }, 250);
+
+    document.addEventListener('touchmove',   earlyMove,  { passive: true });
+    document.addEventListener('touchend',    cancelDrag, { once: true });
+    document.addEventListener('touchcancel', cancelDrag, { once: true });
+  }
+
+  // 長押し前に 10px 以上動いたらスクロールとみなしドラッグキャンセル
+  function earlyMove(e) {
+    if (!dragTimer) return;
+    var t = e.touches[0];
+    var dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
+    if (dx*dx + dy*dy > 100) cancelDrag();
+  }
+
+  function cancelDrag() {
+    if (dragTimer) { clearTimeout(dragTimer); dragTimer = null; }
+    document.removeEventListener('touchmove', earlyMove);
+  }
+
+  // ドラッグ開始
+  function beginDrag(el) {
+    document.removeEventListener('touchmove', earlyMove);
+    isDragging  = true;
+    touchDragEl = el;
+    draggingId  = el.dataset.id;
+    draggingDur = parseFloat(el.dataset.dur || 0);
+    draggingEl  = el;
+
+    var rect = el.getBoundingClientRect();
+    touchOffX = touchStartX - rect.left;
+    touchOffY = touchStartY - rect.top;
+
+    // 指に追従するクローン要素を作成
+    touchClone = el.cloneNode(true);
+    touchClone.removeAttribute('id');
+    Object.assign(touchClone.style, {
+      position:      'fixed',
+      left:          rect.left + 'px',
+      top:           rect.top  + 'px',
+      width:         rect.width + 'px',
+      margin:        '0',
+      zIndex:        '9999',
+      opacity:       '0.82',
+      pointerEvents: 'none',
+      transform:     'scale(1.03)',
+      boxShadow:     '0 8px 24px rgba(0,0,0,0.22)',
+      transition:    'none',
+    });
+    document.body.appendChild(touchClone);
+    el.classList.add('dragging');
+    if (navigator.vibrate) navigator.vibrate(30); // 触覚フィードバック
+
+    document.addEventListener('touchmove',   onMove, { passive: false });
+    document.addEventListener('touchend',    onEnd);
+    document.addEventListener('touchcancel', onEnd);
+  }
+
+  // 指の移動に合わせてクローンを動かし、ドロップ対象をハイライト
+  function onMove(e) {
+    if (!isDragging) return;
+    e.preventDefault(); // スクロール防止
+    var t = e.touches[0];
+    touchClone.style.left = (t.clientX - touchOffX) + 'px';
+    touchClone.style.top  = (t.clientY - touchOffY) + 'px';
+
+    // クローンを一時的に非表示にして指の真下の要素を取得
+    touchClone.style.visibility = 'hidden';
+    var under = document.elementFromPoint(t.clientX, t.clientY);
+    touchClone.style.visibility = '';
+
+    if (hlEl) {
+      hlEl.classList.remove('drag-over-slot', 'drag-over-overflow', 'drag-over-tmrw');
+      hlEl = null;
+    }
+    if (!under) return;
+
+    var ts = under.closest('.time-slot');
+    var tz = under.closest('.tomorrow-zone');
+    var oz = under.closest('.overflow-zone');
+
+    if (ts && ts.querySelector('[id^="slot-"]')) {
+      ts.classList.add('drag-over-slot'); hlEl = ts;
+    } else if (tz) {
+      tz.classList.add('drag-over-tmrw'); hlEl = tz;
+    } else if (oz) {
+      oz.classList.add('drag-over-overflow'); hlEl = oz;
+    }
+  }
+
+  // 指を離したとき — ドロップ先を判定して対応する drop 関数を呼ぶ
+  function onEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    document.removeEventListener('touchmove',   onMove);
+    document.removeEventListener('touchend',    onEnd);
+    document.removeEventListener('touchcancel', onEnd);
+
+    if (touchClone)  { touchClone.remove(); touchClone = null; }
+    if (touchDragEl)   touchDragEl.classList.remove('dragging');
+    if (hlEl) {
+      hlEl.classList.remove('drag-over-slot', 'drag-over-overflow', 'drag-over-tmrw');
+      hlEl = null;
+    }
+
+    if (!draggingId || !e.changedTouches.length) { reset(); return; }
+    var t     = e.changedTouches[0];
+    var under = document.elementFromPoint(t.clientX, t.clientY);
+    if (!under) { reset(); return; }
+
+    var ts = under.closest('.time-slot');
+    var tz = under.closest('.tomorrow-zone');
+
+    if (ts) {
+      var sc = ts.querySelector('[id^="slot-"]');
+      if (sc) {
+        var m = sc.id.match(/slot-(s\d+)-(\d+)/);
+        if (m) {
+          if (m[1] === 's1') dropToS1(parseInt(m[2]));
+          else if (m[1] === 's3') dropToS3(parseInt(m[2]));
+        }
+      }
+    } else if (tz) {
+      var fakeE = { preventDefault: function(){} };
+      var zid   = tz.id;
+      if (zid === 'today-zone')      zoneDrop(fakeE, zid, 's2');
+      else if (zid === 'tmrw-zone-s3') zoneDrop(fakeE, zid, 's3-tmrw');
+    }
+
+    reset();
+  }
+
+  function reset() {
+    draggingId = null; draggingDur = 0; touchDragEl = null;
+  }
+})();
 </script>
 </body>
 </html>
