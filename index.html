@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TPA チュートリアル</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/drag-drop-touch@1.1.0/DragDropTouch.js"></script>
 <style>
 :root {
   --bg: #f5f3ee;
@@ -124,6 +125,10 @@ body {
   user-select: none;
   font-size: 13px;
   line-height: 1.5;
+
+/* ▽ ここを追加 ▽ */
+ touch-action: none;
+ -webkit-user-drag: element;
 }
 
 .task-card:active { cursor: grabbing; transform: scale(1.02); }
@@ -275,6 +280,8 @@ body {
   gap: 8px;
   cursor: grab;
   transition: all 0.2s;
+/* ▽ ここを追加 ▽ */
+ touch-action: none;
 }
 
 .slot-task:active { cursor: grabbing; }
@@ -1198,116 +1205,6 @@ function getTaskName(id) {
 function getTaskIcon(id) {
   const icons = { u1: '📊', u2: '🔍', t3: '📊', t5: '🔍' };
   return icons[id] || '📌';
-}
-// ==============================
-// Firefox対応タッチドラッグ（Pointer Events）
-// ==============================
-
-let touchDraggingEl = null;
-let touchOffsetX = 0;
-let touchOffsetY = 0;
-
-document.addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch') return;
-
-  const el = e.target.closest('.task-card, .zone-task');
-  if (!el) return;
-
-  touchDraggingEl = el;
-
-  const rect = el.getBoundingClientRect();
-  touchOffsetX = e.clientX - rect.left;
-  touchOffsetY = e.clientY - rect.top;
-
-  el.classList.add('dragging');
-  el.style.position = 'fixed';
-  el.style.zIndex = 9999;
-  el.style.pointerEvents = 'none';
-});
-
-document.addEventListener('pointermove', e => {
-  if (!touchDraggingEl) return;
-
-  touchDraggingEl.style.left = (e.clientX - touchOffsetX) + 'px';
-  touchDraggingEl.style.top = (e.clientY - touchOffsetY) + 'px';
-});
-
-document.addEventListener('pointerup', e => {
-  if (!touchDraggingEl) return;
-
-  const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
-
-  // ===== STEP1 =====
-  const slotS1 = dropTarget.closest('[id^="slot-s1-"]');
-  if (slotS1) {
-    const idx = parseInt(slotS1.id.split('-').pop());
-    draggingId = touchDraggingEl.dataset.id;
-    draggingDur = parseFloat(touchDraggingEl.dataset.dur || 0);
-    dropToS1(idx);
-    cleanupTouchDrag();
-    return;
-  }
-
-  // ===== STEP3 =====
-  const slotS3 = dropTarget.closest('[id^="slot-s3-"]');
-  if (slotS3) {
-    const idx = parseInt(slotS3.id.split('-').pop());
-    draggingId = touchDraggingEl.dataset.id;
-    draggingDur = parseFloat(touchDraggingEl.dataset.dur || 0);
-    dropToS3(idx);
-    cleanupTouchDrag();
-    return;
-  }
-
-  // ===== STEP2 / STEP3ゾーン =====
-  const todayZone = dropTarget.closest('#today-zone');
-  if (todayZone) {
-    draggingId = touchDraggingEl.dataset.id;
-    zoneDropFake('today-zone', 's2');
-    cleanupTouchDrag();
-    return;
-  }
-
-  const overflowZone = dropTarget.closest('#overflow-tasks-s3');
-  if (overflowZone) {
-    draggingId = touchDraggingEl.dataset.id;
-    zoneDropFake('overflow-tasks-s3', 's3');
-    cleanupTouchDrag();
-    return;
-  }
-
-  const tmrwZone = dropTarget.closest('#tmrw-zone-s3');
-  if (tmrwZone) {
-    draggingId = touchDraggingEl.dataset.id;
-    zoneDropFake('tmrw-zone-s3', 's3-tmrw');
-    cleanupTouchDrag();
-    return;
-  }
-
-  cleanupTouchDrag();
-});
-
-function cleanupTouchDrag() {
-  if (!touchDraggingEl) return;
-
-  touchDraggingEl.classList.remove('dragging');
-  touchDraggingEl.style.position = '';
-  touchDraggingEl.style.left = '';
-  touchDraggingEl.style.top = '';
-  touchDraggingEl.style.zIndex = '';
-  touchDraggingEl.style.pointerEvents = '';
-
-  touchDraggingEl = null;
-  draggingId = null;
-  draggingDur = 0;
-}
-
-// 既存zoneDropをタッチ用に呼ぶラッパー
-function zoneDropFake(zoneId, step) {
-  const fakeEvent = {
-    preventDefault: () => {},
-  };
-  zoneDrop(fakeEvent, zoneId, step);
 }
 </script>
 </body>
