@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TPA チュートリアル</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface2: #edeae3;
+  --border: #d8d4ca;
+  --text: #1a1916;
+  --text-dim: #857f74;
+  --accent: #3d6b52;
+  --accent-light: #e4ede7;
+  --warn: #b85c38;
+  --warn-light: #f5ebe5;
+  --gold: #8a6c2a;
+  --gold-light: #f5f0e4;
+  --blue: #2a4878;
+  --blue-light: #e5ebf5;
+  --radius: 5px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+.top-bar {
+  background: var(--text);
+  color: #fff;
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.top-bar-title {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+}
+
+.step-indicators {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.step-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  transition: all 0.3s;
+}
+.step-dot.done { background: var(--accent); }
+.step-dot.active { background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.4); }
+
+.main { flex: 1; padding: 32px 24px 80px; max-width: 680px; margin: 0 auto; width: 100%; }
+
+/* ── SCREENS ── */
+.screen { display: none; }
+.screen.active { display: block; animation: slideIn 0.4s ease; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── TYPOGRAPHY ── */
+.step-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.screen-title {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.55;
+  margin-bottom: 10px;
+}
+
+.screen-guide {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── TASK CARD ── */
+.task-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: grab;
+  transition: all 0.2s;
+  box-shadow: var(--shadow);
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.task-card:active { cursor: grabbing; transform: scale(1.02); }
+.task-card.dragging { opacity: 0.4; }
+.task-card.placed { border-color: var(--accent); background: var(--accent-light); cursor: default; }
+.task-card.done-card { border-color: var(--border); background: var(--surface2); opacity: 0.7; }
+.task-card.undone-card { border-color: var(--warn); background: var(--warn-light); }
+.task-card.overflow-card {
+  border-color: var(--warn);
+  background: var(--warn-light);
+  animation: floatUp 0.5s ease forwards;
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0); box-shadow: var(--shadow); }
+  100% { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(184,92,56,0.25); }
+}
+
+.task-icon {
+  width: 32px; height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  background: var(--surface2);
+}
+.task-card.placed .task-icon { background: #c8dfd0; }
+.task-card.undone-card .task-icon { background: #f0d0c0; }
+.task-card.overflow-card .task-icon { background: #f0d0c0; }
+
+.task-info { flex: 1; }
+.task-name { font-weight: 500; font-size: 13px; }
+.task-time {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.task-card.placed .task-time { color: var(--accent); }
+
+.task-handle {
+  font-size: 16px;
+  color: var(--border);
+  cursor: grab;
+}
+
+/* ── TASK POOL ── */
+.task-pool {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+  min-height: 60px;
+  padding: 4px;
+  border-radius: var(--radius);
+  transition: background 0.2s;
+}
+
+.task-pool.drag-over {
+  background: var(--accent-light);
+  border: 2px dashed var(--accent);
+}
+
+/* ── CALENDAR ── */
+.calendar-area {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.cal-header {
+  background: var(--text);
+  color: #fff;
+  padding: 10px 16px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cal-capacity {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.cal-capacity.over { color: #ff8866; }
+
+.time-slots { display: flex; flex-direction: column; }
+
+.time-slot {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  min-height: 52px;
+  transition: background 0.2s;
+}
+
+.time-slot:last-child { border-bottom: none; }
+
+.time-slot.drag-over-slot { background: var(--accent-light); }
+
+.time-label {
+  width: 52px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  letter-spacing: 0.05em;
+}
+
+.slot-content {
+  flex: 1;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 52px;
+}
+
+.slot-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--border);
+  letter-spacing: 0.08em;
+}
+
+.slot-task {
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.slot-task:active { cursor: grabbing; }
+
+.slot-task.overflow {
+  background: var(--warn-light);
+  border-color: var(--warn);
+  animation: pulse-warn 1.5s infinite;
+}
+
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
+.slot-task-name { font-weight: 500; font-size: 12px; flex: 1; }
+.slot-task-dur { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.slot-task.overflow .slot-task-dur { color: var(--warn); }
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.remove-btn:hover { color: var(--warn); }
+
+/* ── OVERFLOW ZONE ── */
+.overflow-zone {
+  border: 2px dashed var(--warn);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 24px;
+  background: var(--warn-light);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.overflow-zone-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--warn);
+  margin-bottom: 4px;
+}
+
+.overflow-zone.drag-over-overflow {
+  background: #f0d5c8;
+  border-color: #a04020;
+}
+
+/* ── TOMORROW ZONE ── */
+.tomorrow-zone {
+  border: 2px dashed var(--blue);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 24px;
+  background: var(--blue-light);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.tomorrow-zone-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 4px;
+}
+
+.tomorrow-zone.drag-over-tmrw {
+  background: #ccd8f0;
+  border-color: #1a3060;
+}
+
+.zone-task {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 3px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: grab;
+}
+
+.zone-task.warn-task { border-left: 3px solid var(--warn); }
+.zone-task.blue-task { border-left: 3px solid var(--blue); }
+
+/* ── INSTRUCTION BOX ── */
+.instruction {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.instruction.accent { border-left-color: var(--accent); background: var(--accent-light); }
+.instruction.warn { border-left-color: var(--warn); background: var(--warn-light); }
+.instruction.silent {
+  border-left-color: var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* ── BUTTON ── */
+.btn {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.04em;
+}
+
+.btn-primary {
+  background: var(--text);
+  color: #fff;
+}
+.btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+/* ── CAPACITY BAR ── */
+.capacity-bar-wrap { margin-bottom: 20px; }
+.capacity-bar-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+.capacity-bar-label span { font-weight: 500; }
+
+.capacity-bar-bg {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.capacity-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.5s ease, background 0.3s;
+}
+
+.capacity-bar-fill.over { background: var(--warn); }
+
+/* ── DIVIDER ── */
+hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+/* ── STATUS BADGE ── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.badge-done { background: var(--accent-light); color: var(--accent); }
+.badge-undone { background: var(--warn-light); color: var(--warn); }
+.badge-moved { background: var(--blue-light); color: var(--blue); }
+
+/* ── FINISH ── */
+.finish-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  border: 1.5px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.insight-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  line-height: 1.8;
+  font-size: 13px;
+}
+
+.insight-label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.final-line {
+  background: var(--text);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  text-align: center;
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.7;
+  margin: 24px 0;
+}
+
+/* ── SECTION DIVIDER ── */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── DONE INDICATOR ── */
+.done-check {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.undone-x {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.btn-row { display: flex; flex-direction: column; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="top-bar">
+  <div class="top-bar-title">TPA チュートリアル</div>
+  <div class="step-indicators">
+    <div class="step-dot active" id="dot-0"></div>
+    <div class="step-dot" id="dot-1"></div>
+    <div class="step-dot" id="dot-2"></div>
+    <div class="step-dot" id="dot-3"></div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ======== INTRO ======== -->
+<div class="screen active" id="screen-intro">
+  <div class="step-label">はじめに</div>
+  <div class="screen-title">3つの体験を<br>やってみてください。</div>
+  <div class="screen-guide">
+    書くことは何もありません。<br>
+    動かすだけです。
+  </div>
+  <div class="instruction">
+    昨日のある1日を再現します。<br>
+    用意してあるタスクを使います。
+  </div>
+  <button class="btn btn-primary" onclick="go('screen-s1')">はじめる →</button>
+</div>
+
+<!-- ======== STEP 1 ======== -->
+<div class="screen" id="screen-s1">
+  <div class="step-label">STEP 1 ／ 3</div>
+  <div class="screen-title">やることを<br>時間に入れてください。</div>
+  <div class="screen-guide">
+    昨日やろうとしていた仕事です。<br>
+    下の枠に、上から順にドラッグして入れてください。
+  </div>
+
+  <!-- Task pool -->
+  <div style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px;">やること（5件）</div>
+  <div class="task-pool" id="pool-s1">
+    <div class="task-card" draggable="true" data-id="t1" data-dur="2.5" ondragstart="dragStart(event)">
+      <div class="task-icon">📋</div>
+      <div class="task-info">
+        <div class="task-name">月次レポートの作成</div>
+        <div class="task-time">2.5時間</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+    <div class="task-card" draggable="true" data-id="t2" data-dur="1.5" ondragstart="dragStart(event)">
+      <div class="task-icon">📩</div>
+      <div class="task-info">
+        <div class="task-name">取引先へのメール返信</div>
+        <div class="task-time">1.5時間</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+    <div class="task-card" draggable="true" data-id="t3" data-dur="3" ondragstart="dragStart(event)">
+      <div class="task-icon">📊</div>
+      <div class="task-info">
+        <div class="task-name">部門会議の資料準備</div>
+        <div class="task-time">3時間</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+    <div class="task-card" draggable="true" data-id="t4" data-dur="1" ondragstart="dragStart(event)">
+      <div class="task-icon">🧑‍💼</div>
+      <div class="task-info">
+        <div class="task-name">部下との1on1</div>
+        <div class="task-time">1時間</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+    <div class="task-card" draggable="true" data-id="t5" data-dur="5" ondragstart="dragStart(event)">
+      <div class="task-icon">🔍</div>
+      <div class="task-info">
+        <div class="task-name">来期計画のリサーチ</div>
+        <div class="task-time">5時間</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+  </div>
+
+  <!-- Capacity bar -->
+  <div class="capacity-bar-wrap" id="cap-wrap-s1" style="display:none;">
+    <div class="capacity-bar-label">
+      <span>使用時間</span>
+      <span id="cap-text-s1">0 ／ 8時間</span>
+    </div>
+    <div class="capacity-bar-bg">
+      <div class="capacity-bar-fill" id="cap-fill-s1" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px;">1日のカレンダー（実働8時間）</div>
+  <div class="calendar-area">
+    <div class="cal-header">
+      <span>昨日</span>
+      <span class="cal-capacity" id="cal-cap-s1">0 ／ 8時間</span>
+    </div>
+    <div class="time-slots" id="slots-s1">
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s1')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s1',0)">
+        <div class="time-label">9:00</div>
+        <div class="slot-content" id="slot-s1-0"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s1')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s1',1)">
+        <div class="time-label">11:00</div>
+        <div class="slot-content" id="slot-s1-1"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s1')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s1',2)">
+        <div class="time-label">13:00</div>
+        <div class="slot-content" id="slot-s1-2"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s1')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s1',3)">
+        <div class="time-label">15:00</div>
+        <div class="slot-content" id="slot-s1-3"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="overflow-msg-s1" style="display:none;">
+    <div class="instruction warn">
+      入りきりませんでした。
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btn-s1" onclick="go('screen-s2')" disabled>次へ →</button>
+</div>
+
+<!-- ======== STEP 2 ======== -->
+<div class="screen" id="screen-s2">
+  <div class="step-label">STEP 2 ／ 3</div>
+  <div class="screen-title">終わらなかったものを<br>今日に移してください。</div>
+  <div class="screen-guide">
+    実際にはこうなりました。<br>
+    終わらなかったタスクを「今日」の枠にドラッグしてください。
+  </div>
+
+  <div style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px;">昨日の結果</div>
+
+  <div class="task-pool" id="pool-s2-done" style="gap:6px;margin-bottom:6px;">
+    <div class="task-card done-card">
+      <div class="done-check">✓</div>
+      <div class="task-icon">📋</div>
+      <div class="task-info">
+        <div class="task-name">月次レポートの作成</div>
+        <div class="task-time" style="color:var(--accent)">完了</div>
+      </div>
+    </div>
+    <div class="task-card done-card">
+      <div class="done-check">✓</div>
+      <div class="task-icon">📩</div>
+      <div class="task-info">
+        <div class="task-name">取引先へのメール返信</div>
+        <div class="task-time" style="color:var(--accent)">完了</div>
+      </div>
+    </div>
+    <div class="task-card done-card">
+      <div class="done-check">✓</div>
+      <div class="task-icon">🧑‍💼</div>
+      <div class="task-info">
+        <div class="task-name">部下との1on1</div>
+        <div class="task-time" style="color:var(--accent)">完了</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="task-pool" id="pool-s2-undone" style="gap:6px;">
+    <div class="task-card undone-card" draggable="true" data-id="u1" ondragstart="dragStart(event)">
+      <div class="undone-x">✕</div>
+      <div class="task-icon">📊</div>
+      <div class="task-info">
+        <div class="task-name">部門会議の資料準備</div>
+        <div class="task-time" style="color:var(--warn)">未完了 ― 今日に移す</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+    <div class="task-card undone-card" draggable="true" data-id="u2" ondragstart="dragStart(event)">
+      <div class="undone-x">✕</div>
+      <div class="task-icon">🔍</div>
+      <div class="task-info">
+        <div class="task-name">来期計画のリサーチ</div>
+        <div class="task-time" style="color:var(--warn)">未完了 ― 今日に移す</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+  </div>
+
+  <div class="section-divider">今日</div>
+
+  <div class="tomorrow-zone" id="today-zone"
+    ondragover="zoneDragOver(event,'today-zone')"
+    ondragleave="zoneDragLeave(event,'today-zone')"
+    ondrop="zoneDrop(event,'today-zone','s2')">
+    <div class="tomorrow-zone-label" style="color:var(--accent); border-color:var(--accent)">今日のカレンダー</div>
+    <div id="today-zone-content" style="display:flex;flex-direction:column;gap:6px;">
+      <div style="font-size:12px; color:var(--text-dim);">ここにドラッグしてください</div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btn-s2" onclick="go('screen-s3')" disabled>次へ →</button>
+</div>
+
+<!-- ======== STEP 3 ======== -->
+<div class="screen" id="screen-s3">
+  <div class="step-label">STEP 3 ／ 3</div>
+  <div class="screen-title">割り込みが入りました。<br>追加してください。</div>
+  <div class="screen-guide">
+    今日、突然この仕事が入りました。<br>
+    カレンダーに追加してください。
+  </div>
+
+  <!-- Interrupt task -->
+  <div class="task-pool" id="pool-s3">
+    <div class="task-card" draggable="true" data-id="i1" data-dur="2" ondragstart="dragStart(event)">
+      <div class="task-icon">⚡</div>
+      <div class="task-info">
+        <div class="task-name">上司からの急ぎ対応</div>
+        <div class="task-time">2時間（今日中）</div>
+      </div>
+      <div class="task-handle">⠿</div>
+    </div>
+  </div>
+
+  <!-- Today calendar with carried-over tasks -->
+  <div style="font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); margin-bottom:10px;">今日のカレンダー</div>
+  <div class="calendar-area">
+    <div class="cal-header">
+      <span>今日</span>
+      <span class="cal-capacity" id="cal-cap-s3">使用中：7時間 ／ 8時間</span>
+    </div>
+    <div class="time-slots" id="slots-s3">
+      <div class="time-slot">
+        <div class="time-label">9:00</div>
+        <div class="slot-content">
+          <div class="slot-task">
+            <span class="slot-task-name">📊 部門会議の資料準備</span>
+            <span class="slot-task-dur">2h</span>
+          </div>
+        </div>
+      </div>
+      <div class="time-slot">
+        <div class="time-label">11:00</div>
+        <div class="slot-content">
+          <div class="slot-task">
+            <span class="slot-task-name">🔍 来期計画のリサーチ</span>
+            <span class="slot-task-dur">5h</span>
+          </div>
+        </div>
+      </div>
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s3')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s3',2)">
+        <div class="time-label">13:00</div>
+        <div class="slot-content" id="slot-s3-2"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+      <div class="time-slot" ondragover="slotDragOver(event,'slots-s3')" ondragleave="slotDragLeave(event)" ondrop="slotDrop(event,'s3',3)">
+        <div class="time-label">15:00</div>
+        <div class="slot-content" id="slot-s3-3"><div class="slot-empty">ここにドラッグ</div></div>
+      </div>
+      <div class="time-slot">
+        <div class="time-label">17:00</div>
+        <div class="slot-content"><div class="slot-empty">空き</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overflow zone - shown when calendar is full -->
+  <div id="overflow-zone-s3" style="display:none;">
+    <div class="instruction warn" style="margin-bottom:12px;">
+      今日の時間に収まりません。<br>
+      下のタスクを明日に移してください。
+    </div>
+    <div class="overflow-zone" id="overflow-tasks-s3"
+      ondragover="zoneDragOver(event,'overflow-tasks-s3')"
+      ondragleave="zoneDragLeave(event,'overflow-tasks-s3')"
+      ondrop="zoneDrop(event,'overflow-tasks-s3','s3')">
+      <div class="overflow-zone-label">溢れたタスク</div>
+    </div>
+    <div class="tomorrow-zone" id="tmrw-zone-s3"
+      ondragover="zoneDragOver(event,'tmrw-zone-s3')"
+      ondragleave="zoneDragLeave(event,'tmrw-zone-s3')"
+      ondrop="zoneDrop(event,'tmrw-zone-s3','s3-tmrw')">
+      <div class="tomorrow-zone-label">明日</div>
+      <div id="tmrw-content" style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px; color:var(--text-dim);">ここにドラッグしてください</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btn-s3" onclick="go('screen-finish')" disabled>完了 →</button>
+</div>
+
+<!-- ======== FINISH ======== -->
+<div class="screen" id="screen-finish">
+  <div class="finish-icon">✓</div>
+  <div class="step-label">完了</div>
+  <div class="screen-title">3つの体験が<br>終わりました。</div>
+
+  <hr>
+
+  <div class="insight-block">
+    <div class="insight-label">STEP 1 で起きたこと</div>
+    5つ入れようとしたら、入りませんでした。<br>
+    「入らない」は判断ではありません。<br>
+    <strong>時間が教えてくれます。</strong>
+  </div>
+
+  <div class="insight-block">
+    <div class="insight-label">STEP 2 で起きたこと</div>
+    終わらなかったものは、今日に来ます。<br>
+    昨日の選択が、今日の時間を決めます。<br>
+    <strong>ズレは消えないで移動します。</strong>
+  </div>
+
+  <div class="insight-block">
+    <div class="insight-label">STEP 3 で起きたこと</div>
+    割り込みが来ると、何かが溢れます。<br>
+    どれが溢れるかは、時間が決めます。<br>
+    <strong>判断しなくていい。動かすだけです。</strong>
+  </div>
+
+  <div class="final-line">
+    ズレたら、<br>同じように動かすだけです。
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="restart()">もう一度</button>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ── STATE ──
+let draggingId = null;
+let draggingDur = 0;
+let draggingEl = null;
+
+// Step1 state
+let s1Slots = { 0: null, 1: null, 2: null, 3: null };
+let s1UsedHours = 0;
+const S1_CAP = 8;
+
+// Step3 state
+let s3Placed = false;
+let overflowMoved = false;
+
+// ── NAVIGATION ──
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  updateDots(id);
+  if (id === 'screen-s3') initS3();
+}
+
+function updateDots(id) {
+  const map = { 'screen-intro': 0, 'screen-s1': 0, 'screen-s2': 1, 'screen-s3': 2, 'screen-finish': 3 };
+  const active = map[id] ?? 0;
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('dot-' + i);
+    d.className = 'step-dot';
+    if (i < active) d.classList.add('done');
+    else if (i === active) d.classList.add('active');
+  }
+}
+
+function restart() {
+  location.reload();
+}
+
+// ── DRAG ──
+function dragStart(e) {
+  draggingId = e.currentTarget.dataset.id;
+  draggingDur = parseFloat(e.currentTarget.dataset.dur || 0);
+  draggingEl = e.currentTarget;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggingId);
+}
+
+document.addEventListener('dragend', () => {
+  document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.drag-over-slot').forEach(el => el.classList.remove('drag-over-slot'));
+});
+
+// ── SLOT DRAG ──
+function slotDragOver(e, slotsId) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over-slot');
+}
+
+function slotDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over-slot');
+}
+
+function slotDrop(e, step, slotIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over-slot');
+
+  if (step === 's1') {
+    dropToS1(slotIdx);
+  } else if (step === 's3') {
+    dropToS3(slotIdx);
+  }
+}
+
+// ── STEP 1 DROP ──
+function dropToS1(slotIdx) {
+  if (!draggingId) return;
+
+  // Check if slot already full (max 2 tasks per slot = 4h)
+  const slotEl = document.getElementById('slot-s1-' + slotIdx);
+  const existing = slotEl.querySelectorAll('.slot-task');
+  if (existing.length >= 1) return; // one task per slot for simplicity
+
+  // Check total capacity
+  const newTotal = s1UsedHours + draggingDur;
+
+  // Remove from pool
+  const poolCard = document.querySelector(`[data-id="${draggingId}"]`);
+  if (poolCard) poolCard.remove();
+
+  // Check overflow
+  const isOver = newTotal > S1_CAP;
+
+  // Add to slot
+  const taskEl = document.createElement('div');
+  taskEl.className = 'slot-task' + (isOver ? ' overflow' : '');
+  taskEl.dataset.id = draggingId;
+  taskEl.dataset.dur = draggingDur;
+  taskEl.innerHTML = `
+    <span class="slot-task-name">${getTaskName(draggingId)}</span>
+    <span class="slot-task-dur">${draggingDur}h</span>
+    <button class="remove-btn" onclick="removeFromS1(this, ${slotIdx}, ${draggingDur})" title="取り消し">×</button>
+  `;
+  slotEl.innerHTML = '';
+  slotEl.appendChild(taskEl);
+
+  // Update hours
+  s1UsedHours = newTotal;
+  s1Slots[slotIdx] = { id: draggingId, dur: draggingDur };
+  updateS1UI(isOver);
+
+  draggingId = null; draggingDur = 0;
+}
+
+function removeFromS1(btn, slotIdx, dur) {
+  const taskEl = btn.closest('.slot-task');
+  const id = taskEl.dataset.id;
+  const slotContent = taskEl.parentElement;
+  slotContent.innerHTML = '<div class="slot-empty">ここにドラッグ</div>';
+  s1UsedHours -= dur;
+  s1Slots[slotIdx] = null;
+
+  // Re-add to pool
+  const pool = document.getElementById('pool-s1');
+  const card = createPoolCard(id, dur);
+  pool.appendChild(card);
+
+  updateS1UI(false);
+}
+
+function createPoolCard(id, dur) {
+  const icons = { t1:'📋', t2:'📩', t3:'📊', t4:'🧑‍💼', t5:'🔍' };
+  const card = document.createElement('div');
+  card.className = 'task-card';
+  card.draggable = true;
+  card.dataset.id = id;
+  card.dataset.dur = dur;
+  card.addEventListener('dragstart', dragStart);
+  card.innerHTML = `
+    <div class="task-icon">${icons[id]||'📌'}</div>
+    <div class="task-info">
+      <div class="task-name">${getTaskName(id)}</div>
+      <div class="task-time">${dur}時間</div>
+    </div>
+    <div class="task-handle">⠿</div>
+  `;
+  return card;
+}
+
+function updateS1UI(isOver) {
+  const pct = Math.min((s1UsedHours / S1_CAP) * 100, 100);
+  document.getElementById('cap-fill-s1').style.width = pct + '%';
+  document.getElementById('cap-fill-s1').className = 'capacity-bar-fill' + (s1UsedHours > S1_CAP ? ' over' : '');
+  document.getElementById('cap-text-s1').textContent = s1UsedHours + ' ／ ' + S1_CAP + '時間';
+  document.getElementById('cal-cap-s1').textContent = s1UsedHours + ' ／ ' + S1_CAP + '時間';
+  document.getElementById('cal-cap-s1').className = 'cal-capacity' + (s1UsedHours > S1_CAP ? ' over' : '');
+  document.getElementById('cap-wrap-s1').style.display = s1UsedHours > 0 ? 'block' : 'none';
+
+  // Show overflow message when over capacity
+  const overMsg = document.getElementById('overflow-msg-s1');
+  if (s1UsedHours > S1_CAP) {
+    overMsg.style.display = 'block';
+    // Mark overflowing tasks
+    document.querySelectorAll('.slot-task').forEach(t => t.classList.add('overflow'));
+  } else {
+    overMsg.style.display = 'none';
+    document.querySelectorAll('.slot-task').forEach(t => t.classList.remove('overflow'));
+  }
+
+  // Enable next when all 4 slots are filled (one task will always remain in pool)
+  const placedCount = Object.values(s1Slots).filter(v => v !== null).length;
+  document.getElementById('btn-s1').disabled = placedCount < 4;
+}
+
+// ── STEP 2 DROP ──
+let s2Moved = 0;
+
+function zoneDragOver(e, zoneId) {
+  e.preventDefault();
+  const el = document.getElementById(zoneId);
+  if (el) el.classList.add('drag-over-overflow', 'drag-over-tmrw');
+}
+
+function zoneDragLeave(e, zoneId) {
+  const el = document.getElementById(zoneId);
+  if (el) el.classList.remove('drag-over-overflow', 'drag-over-tmrw');
+}
+
+function zoneDrop(e, zoneId, step) {
+  e.preventDefault();
+  const el = document.getElementById(zoneId);
+  if (el) el.classList.remove('drag-over-overflow', 'drag-over-tmrw');
+
+  if (!draggingId) return;
+
+  if (step === 's2') {
+    // Move undone task to today
+    const card = document.querySelector(`[data-id="${draggingId}"]`);
+    if (!card) return;
+    card.remove();
+
+    const content = document.getElementById('today-zone-content');
+    if (content.querySelector('div[style]')) content.innerHTML = '';
+    const item = document.createElement('div');
+    item.className = 'zone-task blue-task';
+    item.dataset.id = draggingId;
+    item.innerHTML = `<span>${getTaskIcon(draggingId)} ${getTaskName(draggingId)}</span><span class="status-badge badge-moved">今日へ移動</span>`;
+    content.appendChild(item);
+
+    s2Moved++;
+    if (s2Moved >= 2) {
+      document.getElementById('btn-s2').disabled = false;
+    }
+  }
+
+  if (step === 's3-tmrw') {
+    // Move overflow to tomorrow
+    const overflowEl = document.getElementById('overflow-tasks-s3');
+    const overTask = overflowEl.querySelector('.zone-task');
+    if (!overTask) return;
+    overTask.remove();
+
+    const content = document.getElementById('tmrw-content');
+    if (content.querySelector('div[style]')) content.innerHTML = '';
+    const item = document.createElement('div');
+    item.className = 'zone-task blue-task';
+    item.innerHTML = '<span>🔍 来期計画のリサーチ</span><span class="status-badge badge-moved">明日へ移動</span>';
+    content.appendChild(item);
+
+    overflowMoved = true;
+    document.getElementById('btn-s3').disabled = false;
+  }
+
+  draggingId = null; draggingDur = 0;
+}
+
+// ── STEP 3 ──
+function initS3() {
+  // Nothing extra needed - static HTML set up
+}
+
+let s3Interrupt = false;
+
+function dropToS3(slotIdx) {
+  if (!draggingId) return;
+  const slotEl = document.getElementById('slot-s3-' + slotIdx);
+  if (!slotEl) return;
+  const existing = slotEl.querySelectorAll('.slot-task');
+  if (existing.length >= 1) return;
+
+  const poolCard = document.querySelector(`[data-id="${draggingId}"]`);
+  if (poolCard) poolCard.remove();
+
+  const taskEl = document.createElement('div');
+  taskEl.className = 'slot-task';
+  taskEl.dataset.id = draggingId;
+  taskEl.dataset.dur = draggingDur;
+  taskEl.innerHTML = `<span class="slot-task-name">⚡ 上司からの急ぎ対応</span><span class="slot-task-dur">2h</span>`;
+  slotEl.innerHTML = '';
+  slotEl.appendChild(taskEl);
+
+  // Now show overflow: research task must overflow
+  s3Interrupt = true;
+  document.getElementById('cal-cap-s3').textContent = '使用中：8時間 ／ 8時間（満杯）';
+
+  // Show overflow zone with the research task
+  const overflowZone = document.getElementById('overflow-zone-s3');
+  overflowZone.style.display = 'block';
+
+  const overflowContent = document.getElementById('overflow-tasks-s3');
+  const overflowTask = document.createElement('div');
+  overflowTask.className = 'zone-task warn-task';
+  overflowTask.draggable = true;
+  overflowTask.dataset.id = 'overflow-research';
+  overflowTask.addEventListener('dragstart', dragStart);
+  overflowTask.innerHTML = `<span>🔍 来期計画のリサーチ</span><span class="status-badge badge-undone">溢れた</span>`;
+  overflowContent.appendChild(overflowTask);
+
+  draggingId = null; draggingDur = 0;
+}
+
+// ── HELPERS ──
+function getTaskName(id) {
+  const names = {
+    t1: '月次レポートの作成',
+    t2: '取引先へのメール返信',
+    t3: '部門会議の資料準備',
+    t4: '部下との1on1',
+    t5: '来期計画のリサーチ',
+    u1: '部門会議の資料準備',
+    u2: '来期計画のリサーチ',
+    i1: '上司からの急ぎ対応',
+    'overflow-research': '来期計画のリサーチ',
+  };
+  return names[id] || id;
+}
+
+function getTaskIcon(id) {
+  const icons = { u1: '📊', u2: '🔍', t3: '📊', t5: '🔍' };
+  return icons[id] || '📌';
+}
+</script>
+</body>
+</html>
